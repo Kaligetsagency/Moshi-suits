@@ -11,7 +11,6 @@
         button { background: #1a202c; color: #fff; border: none; font-weight: bold; border-radius: 6px; cursor: pointer; }
         button.print-btn { background: #2b6cb0; }
         button.sell-btn { background: #38a169; }
-        button.alert-btn { background: #e53e3e; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; font-size: 14px; }
         .grid-reports { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -20,6 +19,10 @@
         .report-box p { margin: 0; font-size: 18px; font-weight: bold; }
         .add-link { float: right; font-size: 13px; color: #2b6cb0; text-decoration: none; font-weight: bold; }
         
+        .filter-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; background: #edf2f7; padding: 10px; border-radius: 6px; }
+        .filter-bar select { width: auto; flex-grow: 1; margin: 0; padding: 8px; font-size: 14px; }
+        .filter-bar button { width: auto; margin: 0; padding: 8px 15px; font-size: 14px; }
+
         @media print {
             .no-print { display: none !important; }
             body { background: white; }
@@ -42,13 +45,10 @@
             <option value="56">56</option><option value="58">58</option><option value="60">60</option>
             <option value="62">62</option><option value="64">64</option><option value="66">66</option>
         </select>
-
         <label>Correct Color:</label>
         <select id="editColor"></select>
-
         <label>Correct Design:</label>
         <select id="editDesign"></select>
-
         <label>Correct Stock Quantity:</label>
         <input type="number" id="editStock">
 
@@ -84,22 +84,17 @@
         <h3>🛒 Register a Sale</h3>
         <label>Select Item Sold:</label>
         <select id="saleItem"></select>
-        
         <label>Quantity Sold:</label>
         <input type="number" id="saleQty" value="1">
-        
         <label>Total Price (e.g. 150000):</label>
         <input type="number" id="salePrice" placeholder="Enter total amount">
-        
         <button class="sell-btn" onclick="registerSale()">Record Sale</button>
     </div>
 
     <div class="card">
         <h3>📊 Sales Reports</h3>
         <button class="print-btn no-print" onclick="window.print()">🖨️ Print Reports & Stock</button>
-        
         <div class="grid-reports" id="summaryReports"></div>
-
         <h4 style="margin-top: 20px;">🔥 Top 5 Best Sellers</h4>
         <table>
             <thead><tr><th>Suit Detail</th><th>Total Sold</th></tr></thead>
@@ -110,9 +105,28 @@
     <div class="card">
         <h3>📦 Current Suit Inventory</h3>
         
-        <div style="display: flex; gap: 10px; margin-bottom: 10px;" class="no-print">
-            <button class="alert-btn" onclick="filterRestock()">⚠️ Show Items to Restock</button>
-            <button style="background: #4a5568;" onclick="renderInventory(allSuitsData)">📦 Show All Inventory</button>
+        <div class="filter-bar no-print">
+            <select id="filterSize" onchange="applyFilters()">
+                <option value="ALL">All Sizes</option>
+                <option value="44">44</option><option value="46">46</option><option value="48">48</option>
+                <option value="50">50</option><option value="52">52</option><option value="54">54</option>
+                <option value="56">56</option><option value="58">58</option><option value="60">60</option>
+                <option value="62">62</option><option value="64">64</option><option value="66">66</option>
+            </select>
+            <select id="filterColor" onchange="applyFilters()"><option value="ALL">All Colors</option></select>
+            <select id="filterDesign" onchange="applyFilters()"><option value="ALL">All Designs</option></select>
+            <select id="filterStock" onchange="applyFilters()">
+                <option value="ALL">All Stock</option>
+                <option value="IN">In Stock Only</option>
+                <option value="OUT">Out of Stock (0)</option>
+            </select>
+            <select id="sortBy" onchange="applyFilters()">
+                <option value="default">Sort: Newest</option>
+                <option value="size">Sort: Size</option>
+                <option value="color">Sort: Color</option>
+                <option value="design">Sort: Design</option>
+            </select>
+            <button style="background: #4a5568;" onclick="resetFilters()">🔄 Clear</button>
         </div>
 
         <table>
@@ -122,7 +136,7 @@
     </div>
 
     <script>
-        let allSuitsData = []; // Store globally for filtering
+        let allSuitsData = []; 
 
         async function loadDashboard() {
             await fetchOptions();
@@ -131,13 +145,30 @@
         }
 
         async function fetchOptions() {
+            // Save current selections so they are "sticky"
+            const currentColor = document.getElementById('color').value;
+            const currentDesign = document.getElementById('design').value;
+
             const res = await fetch('/api/options');
             const data = await res.json();
             
-            document.getElementById('color').innerHTML = data.colors.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
-            document.getElementById('design').innerHTML = data.designs.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
+            // Populate Dropdowns
+            const colorOptions = data.colors.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+            const designOptions = data.designs.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
+            
+            document.getElementById('color').innerHTML = colorOptions;
+            document.getElementById('design').innerHTML = designOptions;
+            
+            // Populate Filters
+            document.getElementById('filterColor').innerHTML = `<option value="ALL">All Colors</option>` + colorOptions;
+            document.getElementById('filterDesign').innerHTML = `<option value="ALL">All Designs</option>` + designOptions;
+
+            // Restore the "sticky" selections if they existed
+            if (currentColor) document.getElementById('color').value = currentColor;
+            if (currentDesign) document.getElementById('design').value = currentDesign;
         }
 
+        // Add New Options
         async function addNewColor() {
             const newColor = prompt("Enter the name of the new color:");
             if(newColor && newColor.trim() !== "") {
@@ -145,7 +176,6 @@
                 fetchOptions(); 
             }
         }
-
         async function addNewDesign() {
             const newDesign = prompt("Enter the name of the new design:");
             if(newDesign && newDesign.trim() !== "") {
@@ -154,11 +184,12 @@
             }
         }
 
+        // Fetch and Render Inventory
         async function fetchSuits() {
             const res = await fetch('/api/suits');
             allSuitsData = await res.json();
             
-            renderInventory(allSuitsData);
+            applyFilters(); // Apply any active filters immediately
 
             const saleSelect = document.getElementById('saleItem');
             saleSelect.innerHTML = '<option value="">-- Select a Suit --</option>';
@@ -173,9 +204,7 @@
             const tbody = document.getElementById('inventoryBody');
             tbody.innerHTML = '';
             data.forEach(suit => {
-                // Highlight row if stock is 0
                 const rowStyle = suit.stock === 0 ? "background-color: #fff5f5; color: #c53030;" : "";
-                
                 tbody.innerHTML += `
                 <tr style="${rowStyle}">
                     <td>${suit.size}</td><td>${suit.color}</td><td>${suit.design}</td><td><b>${suit.stock}</b></td>
@@ -187,34 +216,57 @@
             });
         }
 
-        // Restock Filter
-        function filterRestock() {
-            const restockData = allSuitsData.filter(suit => suit.stock === 0);
-            renderInventory(restockData);
+        // SORT AND FILTER LOGIC
+        function applyFilters() {
+            let filtered = [...allSuitsData];
+            
+            const fSize = document.getElementById('filterSize').value;
+            const fColor = document.getElementById('filterColor').value;
+            const fDesign = document.getElementById('filterDesign').value;
+            const fStock = document.getElementById('filterStock').value;
+            const sortMode = document.getElementById('sortBy').value;
+
+            // Filtering
+            if(fSize !== "ALL") filtered = filtered.filter(s => s.size === fSize);
+            if(fColor !== "ALL") filtered = filtered.filter(s => s.color === fColor);
+            if(fDesign !== "ALL") filtered = filtered.filter(s => s.design === fDesign);
+            if(fStock === "OUT") filtered = filtered.filter(s => s.stock === 0);
+            if(fStock === "IN") filtered = filtered.filter(s => s.stock > 0);
+
+            // Sorting
+            if(sortMode === "size") {
+                filtered.sort((a,b) => parseInt(a.size) - parseInt(b.size));
+            } else if(sortMode === "color") {
+                filtered.sort((a,b) => a.color.localeCompare(b.color));
+            } else if(sortMode === "design") {
+                filtered.sort((a,b) => a.design.localeCompare(b.design));
+            }
+
+            renderInventory(filtered);
         }
 
-        // Edit Entry Functions
+        function resetFilters() {
+            document.getElementById('filterSize').value = "ALL";
+            document.getElementById('filterColor').value = "ALL";
+            document.getElementById('filterDesign').value = "ALL";
+            document.getElementById('filterStock').value = "ALL";
+            document.getElementById('sortBy').value = "default";
+            applyFilters();
+        }
+
+        // Edit Functions
         function startEdit(id, size, color, design, stock) {
             const password = prompt("Please enter the Admin Password to edit:");
-            if (password !== "Qwerty") {
-                alert("Incorrect Password!");
-                return;
-            }
+            if (password !== "Qwerty") { alert("Incorrect Password!"); return; }
 
             document.getElementById('editCard').style.display = 'block';
             document.getElementById('editId').value = id;
             document.getElementById('editSize').value = size;
-            
-            // Copy dropdown options from the Add Stock section
             document.getElementById('editColor').innerHTML = document.getElementById('color').innerHTML;
             document.getElementById('editColor').value = color;
-            
             document.getElementById('editDesign').innerHTML = document.getElementById('design').innerHTML;
             document.getElementById('editDesign').value = design;
-            
             document.getElementById('editStock').value = stock;
-
-            // Scroll to top to see the edit form
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
@@ -225,20 +277,13 @@
             const design = document.getElementById('editDesign').value;
             const stock = document.getElementById('editStock').value;
 
-            await fetch(`/api/suits/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ size, color, design, stock })
-            });
-
+            await fetch(`/api/suits/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ size, color, design, stock }) });
             alert("Entry successfully corrected!");
             document.getElementById('editCard').style.display = 'none';
-            loadDashboard(); // Reload data
+            loadDashboard(); 
         }
 
-        function cancelEdit() {
-            document.getElementById('editCard').style.display = 'none';
-        }
+        function cancelEdit() { document.getElementById('editCard').style.display = 'none'; }
 
         // Add Stock Function
         async function addSuit() {
@@ -250,6 +295,10 @@
             if(!stock || stock <= 0) return alert("Enter a valid quantity!");
 
             await fetch('/api/suits', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ size, color, design, stock }) });
+            
+            // Note: We intentionally do NOT reset size, color, or design here to keep them sticky!
+            document.getElementById('stock').value = 1; // Only reset the quantity back to 1
+            
             alert("Stock Added!");
             loadDashboard();
         }
@@ -265,7 +314,6 @@
             if(!total_price) return alert("Enter the total price.");
 
             await fetch('/api/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ suit_id, quantity, total_price }) });
-            
             document.getElementById('salePrice').value = ''; 
             alert("Sale Recorded successfully!");
             loadDashboard();
@@ -296,4 +344,4 @@
         loadDashboard(); 
     </script>
 </body>
-</html>
+                          </html>
