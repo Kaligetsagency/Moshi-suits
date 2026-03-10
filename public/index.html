@@ -3,42 +3,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Moshi Suits Tracker</title>
+    <title>Moshi Suits Dashboard</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f4; }
-        .card { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        input, select, button { width: 100%; padding: 10px; margin: 5px 0 15px 0; box-sizing: border-box; }
-        button { background: #000; color: #fff; border: none; font-weight: bold; border-radius: 4px; }
-        table { width: 100%; border-collapse: collapse; mt-10; }
-        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        body { font-family: Arial, sans-serif; padding: 15px; background: #f4f4f4; margin: 0; }
+        .card { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        input, select, button { width: 100%; padding: 12px; margin: 8px 0 15px 0; box-sizing: border-box; font-size: 16px; }
+        button { background: #1a202c; color: #fff; border: none; font-weight: bold; border-radius: 6px; cursor: pointer; }
+        button.print-btn { background: #2b6cb0; }
+        button.sell-btn { background: #38a169; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; font-size: 14px; }
+        .grid-reports { display: flex; gap: 10px; flex-wrap: wrap; }
+        .report-box { flex: 1; min-width: 45%; background: #edf2f7; padding: 15px; border-radius: 6px; text-align: center; }
+        .report-box h4 { margin: 0 0 5px 0; color: #4a5568; }
+        .report-box p { margin: 0; font-size: 18px; font-weight: bold; }
+        
+        /* This hides entry forms when printing the page */
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; }
+            .card { box-shadow: none; border: 1px solid #ccc; page-break-inside: avoid; }
+        }
     </style>
 </head>
 <body>
 
-    <h2>👔 Moshi Suits Tracker</h2>
+    <h2 style="text-align: center;">👔 Moshi Suits Tracker</h2>
 
-    <div class="card">
-        <h3>Add New Suit Stock</h3>
+    <div class="card no-print">
+        <h3>➕ Add to Stock</h3>
         <label>Size:</label>
         <select id="size">
-            <option value="44">44</option>
-            <option value="46">46</option>
-            <option value="48">48</option>
-            <option value="50">50</option>
+            <option value="44">44</option><option value="46">46</option><option value="48">48</option>
+            <option value="50">50</option><option value="52">52</option><option value="54">54</option>
+            <option value="56">56</option><option value="58">58</option><option value="60">60</option>
+            <option value="62">62</option><option value="64">64</option><option value="66">66</option>
         </select>
 
         <label>Color:</label>
         <select id="color">
-            <option value="Black">Black</option>
-            <option value="Navy">Navy</option>
-            <option value="Gold">Gold</option>
+            <option value="Black">Black</option><option value="Navy">Navy</option>
+            <option value="Grey">Grey</option><option value="Charcoal">Charcoal</option>
+            <option value="Gold">Gold</option><option value="Green">Green</option>
+            <option value="Light Blue">Light Blue</option><option value="Maroon">Maroon</option>
+            <option value="White">White</option>
         </select>
 
         <label>Design:</label>
         <select id="design">
+            <option value="Single Button Suit">Single Button Suit</option>
             <option value="Kaunda Suit">Kaunda Suit</option>
-            <option value="Single Button">Single Button</option>
-            <option value="Tuxedo">Tuxedo</option>
+            <option value="Six Button Suit">Six Button Suit</option>
+            <option value="Double Button Suit">Double Button Suit</option>
+            <option value="Taxido">Taxido (Tuxedo)</option>
         </select>
 
         <label>Quantity to Add:</label>
@@ -47,23 +64,68 @@
         <button onclick="addSuit()">Save to Stock</button>
     </div>
 
+    <div class="card no-print">
+        <h3>🛒 Register a Sale</h3>
+        <label>Select Item Sold:</label>
+        <select id="saleItem">
+            </select>
+        
+        <label>Quantity Sold:</label>
+        <input type="number" id="saleQty" value="1">
+        
+        <label>Total Price (e.g. 150000):</label>
+        <input type="number" id="salePrice" placeholder="Enter total amount">
+        
+        <button class="sell-btn" onclick="registerSale()">Record Sale</button>
+    </div>
+
     <div class="card">
-        <h3>Current Suit Inventory</h3>
+        <h3>📊 Sales Reports</h3>
+        <button class="print-btn no-print" onclick="window.print()">🖨️ Print Reports & Stock</button>
+        
+        <div class="grid-reports" id="summaryReports">
+            </div>
+
+        <h4 style="margin-top: 20px;">🔥 Top 5 Best Sellers</h4>
         <table>
-            <thead><tr><th>Size</th><th>Color</th><th>Design</th><th>Stock</th></tr></thead>
-            <tbody id="inventoryBody">
-                </tbody>
+            <thead><tr><th>Suit Detail</th><th>Total Sold</th></tr></thead>
+            <tbody id="bestSellersBody"></tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>📦 Current Suit Inventory</h3>
+        <table>
+            <thead><tr><th>Size</th><th>Color</th><th>Design</th><th>In Stock</th></tr></thead>
+            <tbody id="inventoryBody"></tbody>
         </table>
     </div>
 
     <script>
+        // Load everything when the page opens
+        async function loadDashboard() {
+            await fetchSuits();
+            await fetchReports();
+        }
+
         async function fetchSuits() {
             const res = await fetch('/api/suits');
             const suits = await res.json();
+            
             const tbody = document.getElementById('inventoryBody');
+            const saleSelect = document.getElementById('saleItem');
+            
             tbody.innerHTML = '';
+            saleSelect.innerHTML = '<option value="">-- Select a Suit --</option>';
+
             suits.forEach(suit => {
+                // Fill Inventory Table
                 tbody.innerHTML += `<tr><td>${suit.size}</td><td>${suit.color}</td><td>${suit.design}</td><td><b>${suit.stock}</b></td></tr>`;
+                
+                // Fill Sales Dropdown (only if in stock)
+                if(suit.stock > 0) {
+                    saleSelect.innerHTML += `<option value="${suit.id}">Size ${suit.size} - ${suit.color} ${suit.design} (Stock: ${suit.stock})</option>`;
+                }
             });
         }
 
@@ -73,15 +135,61 @@
             const design = document.getElementById('design').value;
             const stock = document.getElementById('stock').value;
 
+            if(!stock || stock <= 0) return alert("Enter a valid quantity!");
+
             await fetch('/api/suits', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ size, color, design, stock })
             });
-            fetchSuits(); // Reload table
+            alert("Stock Added!");
+            loadDashboard();
         }
 
-        fetchSuits(); // Load on startup
+        async function registerSale() {
+            const suit_id = document.getElementById('saleItem').value;
+            const quantity = document.getElementById('saleQty').value;
+            const total_price = document.getElementById('salePrice').value;
+
+            if(!suit_id) return alert("Please select a suit to sell.");
+            if(!quantity || quantity <= 0) return alert("Enter a valid quantity.");
+            if(!total_price) return alert("Enter the total price.");
+
+            await fetch('/api/sales', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ suit_id, quantity, total_price })
+            });
+            
+            document.getElementById('salePrice').value = ''; // clear price field
+            alert("Sale Recorded successfully!");
+            loadDashboard();
+        }
+
+        async function fetchReports() {
+            // Get Summaries
+            const sumRes = await fetch('/api/reports/summary');
+            const summary = await sumRes.json();
+            
+            document.getElementById('summaryReports').innerHTML = `
+                <div class="report-box"><h4>Today</h4><p>${summary.daily.qty} items<br>TSh ${summary.daily.revenue}</p></div>
+                <div class="report-box"><h4>This Week</h4><p>${summary.weekly.qty} items<br>TSh ${summary.weekly.revenue}</p></div>
+                <div class="report-box"><h4>This Month</h4><p>${summary.monthly.qty} items<br>TSh ${summary.monthly.revenue}</p></div>
+                <div class="report-box"><h4>This Year</h4><p>${summary.yearly.qty} items<br>TSh ${summary.yearly.revenue}</p></div>
+            `;
+
+            // Get Best Sellers
+            const bestRes = await fetch('/api/reports/bestsellers');
+            const bestSellers = await bestRes.json();
+            
+            const bestBody = document.getElementById('bestSellersBody');
+            bestBody.innerHTML = '';
+            bestSellers.forEach(item => {
+                bestBody.innerHTML += `<tr><td>Size ${item.size} ${item.color} ${item.design}</td><td><b>${item.total_sold}</b></td></tr>`;
+            });
+        }
+
+        loadDashboard(); // Run on startup
     </script>
 </body>
-</html>
+    </html>
