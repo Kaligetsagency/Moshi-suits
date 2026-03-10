@@ -4,14 +4,13 @@ const path = require('path');
 
 const app = express();
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public'))); // Serves your index.html
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Connect to Railway Database
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
 });
 
-// Auto-create the Suits table if it doesn't exist
+// Auto-create Tables
 async function setupDatabase() {
     try {
         await pool.query(`
@@ -21,6 +20,13 @@ async function setupDatabase() {
                 color VARCHAR(50),
                 design VARCHAR(50),
                 stock INT DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS sales (
+                id SERIAL PRIMARY KEY,
+                suit_id INT REFERENCES suits(id),
+                quantity INT,
+                total_price DECIMAL,
+                sale_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
         console.log("Database tables are ready!");
@@ -32,7 +38,7 @@ setupDatabase();
 
 // --- API ROUTES ---
 
-// 1. Get all Suits
+// Get all Suits
 app.get('/api/suits', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM suits ORDER BY id DESC');
@@ -42,21 +48,93 @@ app.get('/api/suits', async (req, res) => {
     }
 });
 
-// 2. Add a new Suit
+// Add a new Suit or Update Stock
 app.post('/api/suits', async (req, res) => {
     const { size, color, design, stock } = req.body;
     try {
-        const result = await pool.query(
-            'INSERT INTO suits (size, color, design, stock) VALUES ($1, $2, $3, $4) RETURNING *',
-            [size, color, design, stock]
+        // Check if this exact suit already exists
+        const existing = await pool.query(
+            'SELECT id, stock FROM suits WHERE size = $1 AND color = $2 AND design = $3',
+            [size, color, design]
         );
-        res.json(result.rows[0]);
+        
+        if (existing.rows.length > 0) {
+            // Update stock if it exists
+            const result = await pool.query(
+                'UPDATE suits SET stock = stock + $1 WHERE id = $2 RETURNING *',
+                [stock, existing.rows[0].id]
+            );
+            res.json(result.rows[0]);
+        } else {
+            // Create new if it doesn't
+            const result = await pool.query(
+                'INSERT INTO suits (size, color, design, stock) VALUES ($1, $2, $3, $4) RETURNING *',
+                [size, color, design, stock]
+            );
+            res.json(result.rows[0]);
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Record a Sale
+app.post('/api/sales', async (req, res) => {
+    const { suit_id, quantity, total_price } = req.body;
+    try {
+        await pool.query('BEGIN');
+        // Record sale
+        await pool.query(
+            'INSERT INTO sales (suit_id, quantity, total_price) VALUES ($1, $2, $3)',
+            [suit_id, quantity, total_price]
+        );
+        // Reduce stock
+        await pool.query(
+            'UPDATE suits SET stock = stock - $1 WHERE id = $2',
+            [quantity, suit_id]
+        );
+        await pool.query('COMMIT');
+        res.json({ message: "Sale recorded successfully!" });
+    } catch (err) {
+        await pool.query('ROLLBACK');
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Get Sales Summaries
+app.get('/api/reports/summary', async (req, res) => {
+    try {
+        const daily = await pool.query(`SELECT COALESCE(SUM(quantity), 0) as qty, COALESCE(SUM(total_price), 0) as revenue FROM sales WHERE DATE(sale_date) = CURRENT_DATE`);
+        const weekly = await pool.query(`SELECT COALESCE(SUM(quantity), 0) as qty, COALESCE(SUM(total_price), 0) as revenue FROM sales WHERE sale_date >= date_trunc('week', CURRENT_DATE)`);
+        const monthly = await pool.query(`SELECT COALESCE(SUM(quantity), 0) as qty, COALESCE(SUM(total_price), 0) as revenue FROM sales WHERE sale_date >= date_trunc('month', CURRENT_DATE)`);
+        const yearly = await pool.query(`SELECT COALESCE(SUM(quantity), 0) as qty, COALESCE(SUM(total_price), 0) as revenue FROM sales WHERE sale_date >= date_trunc('year', CURRENT_DATE)`);
+        
+        res.json({
+            daily: daily.rows[0],
+            weekly: weekly.rows[0],
+            monthly: monthly.rows[0],
+            yearly: yearly.rows[0]
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Get Best Sellers
+app.get('/api/reports/bestsellers', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT s.size, s.color, s.design, SUM(sa.quantity) as total_sold 
+            FROM sales sa 
+            JOIN suits s ON sa.suit_id = s.id 
+            GROUP BY s.id 
+            ORDER BY total_sold DESC LIMIT 5
+        `);
+        res.json(result.rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
