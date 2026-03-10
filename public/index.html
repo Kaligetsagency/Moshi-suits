@@ -17,8 +17,8 @@
         .report-box { flex: 1; min-width: 45%; background: #edf2f7; padding: 15px; border-radius: 6px; text-align: center; }
         .report-box h4 { margin: 0 0 5px 0; color: #4a5568; }
         .report-box p { margin: 0; font-size: 18px; font-weight: bold; }
+        .add-link { float: right; font-size: 13px; color: #2b6cb0; text-decoration: none; font-weight: bold; }
         
-        /* This hides entry forms when printing the page */
         @media print {
             .no-print { display: none !important; }
             body { background: white; }
@@ -40,23 +40,13 @@
             <option value="62">62</option><option value="64">64</option><option value="66">66</option>
         </select>
 
-        <label>Color:</label>
+        <label>Color: <a href="#" class="add-link" onclick="addNewColor()">+ Add New Color</a></label>
         <select id="color">
-            <option value="Black">Black</option><option value="Navy">Navy</option>
-            <option value="Grey">Grey</option><option value="Charcoal">Charcoal</option>
-            <option value="Gold">Gold</option><option value="Green">Green</option>
-            <option value="Light Blue">Light Blue</option><option value="Maroon">Maroon</option>
-            <option value="White">White</option>
-        </select>
+            </select>
 
-        <label>Design:</label>
+        <label>Design: <a href="#" class="add-link" onclick="addNewDesign()">+ Add New Design</a></label>
         <select id="design">
-            <option value="Single Button Suit">Single Button Suit</option>
-            <option value="Kaunda Suit">Kaunda Suit</option>
-            <option value="Six Button Suit">Six Button Suit</option>
-            <option value="Double Button Suit">Double Button Suit</option>
-            <option value="Taxido">Taxido (Tuxedo)</option>
-        </select>
+            </select>
 
         <label>Quantity to Add:</label>
         <input type="number" id="stock" value="1">
@@ -67,8 +57,7 @@
     <div class="card no-print">
         <h3>🛒 Register a Sale</h3>
         <label>Select Item Sold:</label>
-        <select id="saleItem">
-            </select>
+        <select id="saleItem"></select>
         
         <label>Quantity Sold:</label>
         <input type="number" id="saleQty" value="1">
@@ -83,8 +72,7 @@
         <h3>📊 Sales Reports</h3>
         <button class="print-btn no-print" onclick="window.print()">🖨️ Print Reports & Stock</button>
         
-        <div class="grid-reports" id="summaryReports">
-            </div>
+        <div class="grid-reports" id="summaryReports"></div>
 
         <h4 style="margin-top: 20px;">🔥 Top 5 Best Sellers</h4>
         <table>
@@ -102,10 +90,45 @@
     </div>
 
     <script>
-        // Load everything when the page opens
         async function loadDashboard() {
+            await fetchOptions();
             await fetchSuits();
             await fetchReports();
+        }
+
+        // Fetch dynamic colors and designs from the database
+        async function fetchOptions() {
+            const res = await fetch('/api/options');
+            const data = await res.json();
+            
+            document.getElementById('color').innerHTML = data.colors.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+            document.getElementById('design').innerHTML = data.designs.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
+        }
+
+        // Add a brand new color via prompt
+        async function addNewColor() {
+            const newColor = prompt("Enter the name of the new color:");
+            if(newColor && newColor.trim() !== "") {
+                await fetch('/api/colors', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: newColor.trim() })
+                });
+                fetchOptions(); // Refresh the list instantly
+            }
+        }
+
+        // Add a brand new design via prompt
+        async function addNewDesign() {
+            const newDesign = prompt("Enter the name of the new design (e.g., Italian Cut):");
+            if(newDesign && newDesign.trim() !== "") {
+                await fetch('/api/designs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: newDesign.trim() })
+                });
+                fetchOptions(); // Refresh the list instantly
+            }
         }
 
         async function fetchSuits() {
@@ -119,10 +142,7 @@
             saleSelect.innerHTML = '<option value="">-- Select a Suit --</option>';
 
             suits.forEach(suit => {
-                // Fill Inventory Table
                 tbody.innerHTML += `<tr><td>${suit.size}</td><td>${suit.color}</td><td>${suit.design}</td><td><b>${suit.stock}</b></td></tr>`;
-                
-                // Fill Sales Dropdown (only if in stock)
                 if(suit.stock > 0) {
                     saleSelect.innerHTML += `<option value="${suit.id}">Size ${suit.size} - ${suit.color} ${suit.design} (Stock: ${suit.stock})</option>`;
                 }
@@ -161,13 +181,12 @@
                 body: JSON.stringify({ suit_id, quantity, total_price })
             });
             
-            document.getElementById('salePrice').value = ''; // clear price field
+            document.getElementById('salePrice').value = ''; 
             alert("Sale Recorded successfully!");
             loadDashboard();
         }
 
         async function fetchReports() {
-            // Get Summaries
             const sumRes = await fetch('/api/reports/summary');
             const summary = await sumRes.json();
             
@@ -178,7 +197,6 @@
                 <div class="report-box"><h4>This Year</h4><p>${summary.yearly.qty} items<br>TSh ${summary.yearly.revenue}</p></div>
             `;
 
-            // Get Best Sellers
             const bestRes = await fetch('/api/reports/bestsellers');
             const bestSellers = await bestRes.json();
             
@@ -189,7 +207,7 @@
             });
         }
 
-        loadDashboard(); // Run on startup
+        loadDashboard(); 
     </script>
 </body>
-    </html>
+</html>
