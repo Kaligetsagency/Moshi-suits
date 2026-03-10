@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moshi Suits Tracker</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f4; }
+        .card { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        input, select, button { width: 100%; padding: 10px; margin: 5px 0 15px 0; box-sizing: border-box; }
+        button { background: #000; color: #fff; border: none; font-weight: bold; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; mt-10; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+    </style>
+</head>
+<body>
+
+    <h2>👔 Moshi Suits Tracker</h2>
+
+    <div class="card">
+        <h3>Add New Suit Stock</h3>
+        <label>Size:</label>
+        <select id="size">
+            <option value="44">44</option>
+            <option value="46">46</option>
+            <option value="48">48</option>
+            <option value="50">50</option>
+        </select>
+
+        <label>Color:</label>
+        <select id="color">
+            <option value="Black">Black</option>
+            <option value="Navy">Navy</option>
+            <option value="Gold">Gold</option>
+        </select>
+
+        <label>Design:</label>
+        <select id="design">
+            <option value="Kaunda Suit">Kaunda Suit</option>
+            <option value="Single Button">Single Button</option>
+            <option value="Tuxedo">Tuxedo</option>
+        </select>
+
+        <label>Quantity to Add:</label>
+        <input type="number" id="stock" value="1">
+
+        <button onclick="addSuit()">Save to Stock</button>
+    </div>
+
+    <div class="card">
+        <h3>Current Suit Inventory</h3>
+        <table>
+            <thead><tr><th>Size</th><th>Color</th><th>Design</th><th>Stock</th></tr></thead>
+            <tbody id="inventoryBody">
+                </tbody>
+        </table>
+    </div>
+
+    <script>
+        async function fetchSuits() {
+            const res = await fetch('/api/suits');
+            const suits = await res.json();
+            const tbody = document.getElementById('inventoryBody');
+            tbody.innerHTML = '';
+            suits.forEach(suit => {
+                tbody.innerHTML += `<tr><td>${suit.size}</td><td>${suit.color}</td><td>${suit.design}</td><td><b>${suit.stock}</b></td></tr>`;
+            });
+        }
+
+        async function addSuit() {
+            const size = document.getElementById('size').value;
+            const color = document.getElementById('color').value;
+            const design = document.getElementById('design').value;
+            const stock = document.getElementById('stock').value;
+
+            await fetch('/api/suits', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ size, color, design, stock })
+            });
+            fetchSuits(); // Reload table
+        }
+
+        fetchSuits(); // Load on startup
+    </script>
+</body>
+</html>
