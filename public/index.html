@@ -11,6 +11,7 @@
         button { background: #1a202c; color: #fff; border: none; font-weight: bold; border-radius: 6px; cursor: pointer; }
         button.print-btn { background: #2b6cb0; }
         button.sell-btn { background: #38a169; }
+        button.alert-btn { background: #e53e3e; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; font-size: 14px; }
         .grid-reports { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -30,6 +31,33 @@
 
     <h2 style="text-align: center;">👔 Moshi Suits Tracker</h2>
 
+    <div class="card no-print" id="editCard" style="display: none; border: 2px solid #ecc94b; background: #fffff0;">
+        <h3 style="color: #b7791f;">✏️ Edit Wrong Entry</h3>
+        <input type="hidden" id="editId">
+
+        <label>Correct Size:</label>
+        <select id="editSize">
+            <option value="44">44</option><option value="46">46</option><option value="48">48</option>
+            <option value="50">50</option><option value="52">52</option><option value="54">54</option>
+            <option value="56">56</option><option value="58">58</option><option value="60">60</option>
+            <option value="62">62</option><option value="64">64</option><option value="66">66</option>
+        </select>
+
+        <label>Correct Color:</label>
+        <select id="editColor"></select>
+
+        <label>Correct Design:</label>
+        <select id="editDesign"></select>
+
+        <label>Correct Stock Quantity:</label>
+        <input type="number" id="editStock">
+
+        <div style="display: flex; gap: 10px;">
+            <button style="background: #ecc94b; color: black;" onclick="submitEdit()">💾 Save Changes</button>
+            <button style="background: #a0aec0;" onclick="cancelEdit()">❌ Cancel</button>
+        </div>
+    </div>
+
     <div class="card no-print">
         <h3>➕ Add to Stock</h3>
         <label>Size:</label>
@@ -41,12 +69,10 @@
         </select>
 
         <label>Color: <a href="#" class="add-link" onclick="addNewColor()">+ Add New Color</a></label>
-        <select id="color">
-            </select>
+        <select id="color"></select>
 
         <label>Design: <a href="#" class="add-link" onclick="addNewDesign()">+ Add New Design</a></label>
-        <select id="design">
-            </select>
+        <select id="design"></select>
 
         <label>Quantity to Add:</label>
         <input type="number" id="stock" value="1">
@@ -83,20 +109,27 @@
 
     <div class="card">
         <h3>📦 Current Suit Inventory</h3>
+        
+        <div style="display: flex; gap: 10px; margin-bottom: 10px;" class="no-print">
+            <button class="alert-btn" onclick="filterRestock()">⚠️ Show Items to Restock</button>
+            <button style="background: #4a5568;" onclick="renderInventory(allSuitsData)">📦 Show All Inventory</button>
+        </div>
+
         <table>
-            <thead><tr><th>Size</th><th>Color</th><th>Design</th><th>In Stock</th></tr></thead>
+            <thead><tr><th>Size</th><th>Color</th><th>Design</th><th>In Stock</th><th class="no-print">Action</th></tr></thead>
             <tbody id="inventoryBody"></tbody>
         </table>
     </div>
 
     <script>
+        let allSuitsData = []; // Store globally for filtering
+
         async function loadDashboard() {
             await fetchOptions();
             await fetchSuits();
             await fetchReports();
         }
 
-        // Fetch dynamic colors and designs from the database
         async function fetchOptions() {
             const res = await fetch('/api/options');
             const data = await res.json();
@@ -105,50 +138,109 @@
             document.getElementById('design').innerHTML = data.designs.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
         }
 
-        // Add a brand new color via prompt
         async function addNewColor() {
             const newColor = prompt("Enter the name of the new color:");
             if(newColor && newColor.trim() !== "") {
-                await fetch('/api/colors', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: newColor.trim() })
-                });
-                fetchOptions(); // Refresh the list instantly
+                await fetch('/api/colors', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newColor.trim() }) });
+                fetchOptions(); 
             }
         }
 
-        // Add a brand new design via prompt
         async function addNewDesign() {
-            const newDesign = prompt("Enter the name of the new design (e.g., Italian Cut):");
+            const newDesign = prompt("Enter the name of the new design:");
             if(newDesign && newDesign.trim() !== "") {
-                await fetch('/api/designs', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: newDesign.trim() })
-                });
-                fetchOptions(); // Refresh the list instantly
+                await fetch('/api/designs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newDesign.trim() }) });
+                fetchOptions(); 
             }
         }
 
         async function fetchSuits() {
             const res = await fetch('/api/suits');
-            const suits = await res.json();
+            allSuitsData = await res.json();
             
-            const tbody = document.getElementById('inventoryBody');
-            const saleSelect = document.getElementById('saleItem');
-            
-            tbody.innerHTML = '';
-            saleSelect.innerHTML = '<option value="">-- Select a Suit --</option>';
+            renderInventory(allSuitsData);
 
-            suits.forEach(suit => {
-                tbody.innerHTML += `<tr><td>${suit.size}</td><td>${suit.color}</td><td>${suit.design}</td><td><b>${suit.stock}</b></td></tr>`;
+            const saleSelect = document.getElementById('saleItem');
+            saleSelect.innerHTML = '<option value="">-- Select a Suit --</option>';
+            allSuitsData.forEach(suit => {
                 if(suit.stock > 0) {
                     saleSelect.innerHTML += `<option value="${suit.id}">Size ${suit.size} - ${suit.color} ${suit.design} (Stock: ${suit.stock})</option>`;
                 }
             });
         }
 
+        function renderInventory(data) {
+            const tbody = document.getElementById('inventoryBody');
+            tbody.innerHTML = '';
+            data.forEach(suit => {
+                // Highlight row if stock is 0
+                const rowStyle = suit.stock === 0 ? "background-color: #fff5f5; color: #c53030;" : "";
+                
+                tbody.innerHTML += `
+                <tr style="${rowStyle}">
+                    <td>${suit.size}</td><td>${suit.color}</td><td>${suit.design}</td><td><b>${suit.stock}</b></td>
+                    <td class="no-print">
+                        <button style="background: #ecc94b; color: black; padding: 5px; margin: 0; font-size: 12px; width: auto;" 
+                        onclick="startEdit(${suit.id}, '${suit.size}', '${suit.color}', '${suit.design}', ${suit.stock})">✏️ Edit</button>
+                    </td>
+                </tr>`;
+            });
+        }
+
+        // Restock Filter
+        function filterRestock() {
+            const restockData = allSuitsData.filter(suit => suit.stock === 0);
+            renderInventory(restockData);
+        }
+
+        // Edit Entry Functions
+        function startEdit(id, size, color, design, stock) {
+            const password = prompt("Please enter the Admin Password to edit:");
+            if (password !== "Qwerty") {
+                alert("Incorrect Password!");
+                return;
+            }
+
+            document.getElementById('editCard').style.display = 'block';
+            document.getElementById('editId').value = id;
+            document.getElementById('editSize').value = size;
+            
+            // Copy dropdown options from the Add Stock section
+            document.getElementById('editColor').innerHTML = document.getElementById('color').innerHTML;
+            document.getElementById('editColor').value = color;
+            
+            document.getElementById('editDesign').innerHTML = document.getElementById('design').innerHTML;
+            document.getElementById('editDesign').value = design;
+            
+            document.getElementById('editStock').value = stock;
+
+            // Scroll to top to see the edit form
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        async function submitEdit() {
+            const id = document.getElementById('editId').value;
+            const size = document.getElementById('editSize').value;
+            const color = document.getElementById('editColor').value;
+            const design = document.getElementById('editDesign').value;
+            const stock = document.getElementById('editStock').value;
+
+            await fetch(`/api/suits/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ size, color, design, stock })
+            });
+
+            alert("Entry successfully corrected!");
+            document.getElementById('editCard').style.display = 'none';
+            loadDashboard(); // Reload data
+        }
+
+        function cancelEdit() {
+            document.getElementById('editCard').style.display = 'none';
+        }
+
+        // Add Stock Function
         async function addSuit() {
             const size = document.getElementById('size').value;
             const color = document.getElementById('color').value;
@@ -157,15 +249,12 @@
 
             if(!stock || stock <= 0) return alert("Enter a valid quantity!");
 
-            await fetch('/api/suits', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ size, color, design, stock })
-            });
+            await fetch('/api/suits', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ size, color, design, stock }) });
             alert("Stock Added!");
             loadDashboard();
         }
 
+        // Register Sale Function
         async function registerSale() {
             const suit_id = document.getElementById('saleItem').value;
             const quantity = document.getElementById('saleQty').value;
@@ -175,17 +264,14 @@
             if(!quantity || quantity <= 0) return alert("Enter a valid quantity.");
             if(!total_price) return alert("Enter the total price.");
 
-            await fetch('/api/sales', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ suit_id, quantity, total_price })
-            });
+            await fetch('/api/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ suit_id, quantity, total_price }) });
             
             document.getElementById('salePrice').value = ''; 
             alert("Sale Recorded successfully!");
             loadDashboard();
         }
 
+        // Fetch Reports
         async function fetchReports() {
             const sumRes = await fetch('/api/reports/summary');
             const summary = await sumRes.json();
