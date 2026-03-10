@@ -145,30 +145,25 @@
         }
 
         async function fetchOptions() {
-            // Save current selections so they are "sticky"
             const currentColor = document.getElementById('color').value;
             const currentDesign = document.getElementById('design').value;
 
             const res = await fetch('/api/options');
             const data = await res.json();
             
-            // Populate Dropdowns
             const colorOptions = data.colors.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
             const designOptions = data.designs.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
             
             document.getElementById('color').innerHTML = colorOptions;
             document.getElementById('design').innerHTML = designOptions;
             
-            // Populate Filters
             document.getElementById('filterColor').innerHTML = `<option value="ALL">All Colors</option>` + colorOptions;
             document.getElementById('filterDesign').innerHTML = `<option value="ALL">All Designs</option>` + designOptions;
 
-            // Restore the "sticky" selections if they existed
             if (currentColor) document.getElementById('color').value = currentColor;
             if (currentDesign) document.getElementById('design').value = currentDesign;
         }
 
-        // Add New Options
         async function addNewColor() {
             const newColor = prompt("Enter the name of the new color:");
             if(newColor && newColor.trim() !== "") {
@@ -184,12 +179,11 @@
             }
         }
 
-        // Fetch and Render Inventory
         async function fetchSuits() {
             const res = await fetch('/api/suits');
             allSuitsData = await res.json();
             
-            applyFilters(); // Apply any active filters immediately
+            applyFilters(); 
 
             const saleSelect = document.getElementById('saleItem');
             saleSelect.innerHTML = '<option value="">-- Select a Suit --</option>';
@@ -216,7 +210,7 @@
             });
         }
 
-        // SORT AND FILTER LOGIC
+        // --- UPDATED SORT AND FILTER LOGIC ---
         function applyFilters() {
             let filtered = [...allSuitsData];
             
@@ -226,20 +220,37 @@
             const fStock = document.getElementById('filterStock').value;
             const sortMode = document.getElementById('sortBy').value;
 
-            // Filtering
+            // 1. Apply Filtering First
             if(fSize !== "ALL") filtered = filtered.filter(s => s.size === fSize);
             if(fColor !== "ALL") filtered = filtered.filter(s => s.color === fColor);
             if(fDesign !== "ALL") filtered = filtered.filter(s => s.design === fDesign);
             if(fStock === "OUT") filtered = filtered.filter(s => s.stock === 0);
             if(fStock === "IN") filtered = filtered.filter(s => s.stock > 0);
 
-            // Sorting
+            // 2. Apply Sorting with Secondary Size Sort
             if(sortMode === "size") {
+                // Sort just by size (smallest to biggest)
                 filtered.sort((a,b) => parseInt(a.size) - parseInt(b.size));
+                
             } else if(sortMode === "color") {
-                filtered.sort((a,b) => a.color.localeCompare(b.color));
+                // Sort by Color first...
+                filtered.sort((a,b) => {
+                    if (a.color === b.color) {
+                        // ...If colors are the exact same, sort those by size
+                        return parseInt(a.size) - parseInt(b.size);
+                    }
+                    return a.color.localeCompare(b.color);
+                });
+                
             } else if(sortMode === "design") {
-                filtered.sort((a,b) => a.design.localeCompare(b.design));
+                // Sort by Design first...
+                filtered.sort((a,b) => {
+                    if (a.design === b.design) {
+                        // ...If designs are the exact same, sort those by size
+                        return parseInt(a.size) - parseInt(b.size);
+                    }
+                    return a.design.localeCompare(b.design);
+                });
             }
 
             renderInventory(filtered);
@@ -254,7 +265,6 @@
             applyFilters();
         }
 
-        // Edit Functions
         function startEdit(id, size, color, design, stock) {
             const password = prompt("Please enter the Admin Password to edit:");
             if (password !== "Qwerty") { alert("Incorrect Password!"); return; }
@@ -285,7 +295,6 @@
 
         function cancelEdit() { document.getElementById('editCard').style.display = 'none'; }
 
-        // Add Stock Function
         async function addSuit() {
             const size = document.getElementById('size').value;
             const color = document.getElementById('color').value;
@@ -296,14 +305,12 @@
 
             await fetch('/api/suits', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ size, color, design, stock }) });
             
-            // Note: We intentionally do NOT reset size, color, or design here to keep them sticky!
-            document.getElementById('stock').value = 1; // Only reset the quantity back to 1
+            document.getElementById('stock').value = 1; 
             
             alert("Stock Added!");
             loadDashboard();
         }
 
-        // Register Sale Function
         async function registerSale() {
             const suit_id = document.getElementById('saleItem').value;
             const quantity = document.getElementById('saleQty').value;
@@ -319,7 +326,6 @@
             loadDashboard();
         }
 
-        // Fetch Reports
         async function fetchReports() {
             const sumRes = await fetch('/api/reports/summary');
             const summary = await sumRes.json();
@@ -344,4 +350,4 @@
         loadDashboard(); 
     </script>
 </body>
-                          </html>
+                                              </html>
